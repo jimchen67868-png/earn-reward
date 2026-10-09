@@ -12,6 +12,7 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.RequestConfiguration
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.gms.ads.rewarded.ServerSideVerificationOptions
@@ -32,7 +33,11 @@ import com.google.firebase.firestore.ListenerRegistration
  */
 class MainActivity : AppCompatActivity() {
 
-    private val testRewardedId = "ca-app-pub-3940256099942544/5224354917" // test ad unit
+    private val testRewardedId = "ca-app-pub-4283964646300912/9324597260" // your rewarded ad unit
+
+    // Add your phone's test device ID here (find it in logcat: "setTestDeviceIds").
+    // Your device then gets TEST ads from your real unit, which is safe for your account.
+    private val testDeviceIds: List<String> = listOf()
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
 
@@ -56,6 +61,9 @@ class MainActivity : AppCompatActivity() {
             addView(watchButton)
         })
 
+        MobileAds.setRequestConfiguration(
+            RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
+        )
         MobileAds.initialize(this) {}
         signIn()
     }

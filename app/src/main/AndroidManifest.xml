@@ -7,10 +7,10 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.EarnReward">
 
-        <!-- Google TEST AdMob app ID. Replace with your own before publishing. -->
+        <!-- Your AdMob app ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-4283964646300912~5148628669" />
 
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
