@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/*.js": {
+      "includeFiles": "node_modules/tiny-secp256k1/lib/**"
+    }
+  },
   "crons": [
     { "path": "/api/pay-batch", "schedule": "0 12 * * *" }
   ]
