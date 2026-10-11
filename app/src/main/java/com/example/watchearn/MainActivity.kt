@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
     private val testDeviceIds: List<String> = listOf()
 
     private val withdrawUrl = "https://earn-reward-537n.vercel.app/api/withdraw"
-    private val minWithdrawPoints = 100000L // keep in sync with api/withdraw.js
+    private val minWithdrawPoints = 2000L // keep in sync with api/withdraw.js
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()

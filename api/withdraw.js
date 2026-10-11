@@ -4,7 +4,7 @@
 const admin = require("firebase-admin");
 const { isValidLtcAddress } = require("../lib/ltc");
 
-const MIN_POINTS = 100000;     // minimum withdrawal
+const MIN_POINTS = 2000;     // minimum withdrawal
 const POINTS_PER_USD = 200000; // 200000 points = $1.00 (keep this well below your real ad earnings!)
 
 if (!admin.apps.length) {
@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
       t.set(reqRef, {
         uid,
         points,
-        usd: Math.round((points / POINTS_PER_USD) * 100) / 100,
+        usd: Math.round((points / POINTS_PER_USD) * 1e6) / 1e6,
         method: "LTC",
         account,
         status: "queued", // pay-batch sets: sending -> paid / needs_review
