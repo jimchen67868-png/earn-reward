@@ -1,14 +1,17 @@
-// Firebase Cloud Function: receives AdMob server-side verification (SSV) callbacks,
-// verifies Google's signature, and credits points once per transaction.
-const { onRequest } = require("firebase-functions/v2/https");
+// Vercel serverless function: AdMob server-side verification (SSV) callback.
+// Verifies Google's signature, then credits points in Firestore once per transaction.
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 
-admin.initializeApp();
-const db = admin.firestore();
-
 const POINTS_PER_AD = 10;
 const DAILY_AD_CAP = 30; // max rewarded ads per user per day
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+  });
+}
+const db = admin.firestore();
 
 let keyCache = { keys: null, at: 0 };
 
@@ -22,10 +25,10 @@ async function getKeys() {
   return keys;
 }
 
-exports.admobSsv = onRequest(async (req, res) => {
+module.exports = async (req, res) => {
   try {
     // The signed message is the raw query string up to "&signature="
-    const qs = req.originalUrl.split("?")[1] || "";
+    const qs = (req.url || "").split("?")[1] || "";
     const idx = qs.indexOf("&signature=");
     if (idx < 0) return res.status(400).send("missing signature");
 
@@ -51,7 +54,7 @@ exports.admobSsv = onRequest(async (req, res) => {
       const [tx, day] = await Promise.all([t.get(txRef), t.get(dayRef)]);
       if (tx.exists) return; // already credited (AdMob retries)
       const count = day.exists ? day.data().count : 0;
-      if (count >= DAILY_AD_CAP) return; // over daily cap, no credit
+      if (count >= DAILY_AD_CAP) return; // over daily cap
 
       const FV = admin.firestore.FieldValue;
       t.set(txRef, { uid: user_id, at: FV.serverTimestamp() });
@@ -64,4 +67,4 @@ exports.admobSsv = onRequest(async (req, res) => {
     console.error(e);
     res.status(500).send("error");
   }
-});
+};

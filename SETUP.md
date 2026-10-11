@@ -1,22 +1,16 @@
-# Firebase setup
+# Setup (free plan, no Firebase Functions)
 
-1. console.firebase.google.com > create project > add Android app (package com.example.watchearn).
-   Download `google-services.json` into your Android `app/` folder.
-2. Authentication > Sign-in method > enable **Anonymous**.
-3. Firestore Database > create (production mode), then paste `firestore.rules` into the Rules tab.
-4. Upgrade to the **Blaze** plan (needed for Cloud Functions to call Google's key server; free tier usage still applies).
-5. Deploy the function:
-   ```
-   npm install -g firebase-tools
-   firebase login
-   firebase init functions     # choose JavaScript, use existing files
-   firebase deploy --only functions
-   ```
-   Copy the `admobSsv` function URL it prints.
-6. AdMob console > your rewarded ad unit > **Server-side verification** > enable, paste the function URL.
-7. Run the app. After watching an ad, the balance should rise within a few seconds.
+## Firebase (Spark plan is fine)
+1. Authentication > Sign-in method > enable **Anonymous**.
+2. Firestore Database > create, then paste `firestore.rules` in the Rules tab.
+3. Project settings (gear) > Service accounts > **Generate new private key**.
+   Keep that JSON secret. Never commit it or share it.
 
-# Before real payouts
-- Anonymous accounts vanish on uninstall. Link a Google or email login (`linkWithCredential`) so balances survive.
-- Add a `withdrawals` flow (user requests, you review manually first).
-- Add Play Integrity checks and watch for abnormal ad counts per user.
+## Vercel (free Hobby plan)
+1. vercel.com > sign in with GitHub > Add New > Project > import `earn-reward`.
+2. Framework Preset: **Other**. Leave build settings empty.
+3. Environment Variables: name `FIREBASE_SERVICE_ACCOUNT`, value = the entire service account JSON.
+4. Deploy. Your endpoint is `https://<project>.vercel.app/api/admob-ssv`.
+
+## AdMob
+Ad unit > Server-side verification > enable > paste the endpoint URL.
