@@ -58,7 +58,7 @@ class MainActivity : AppCompatActivity() {
 
         pointsText = TextView(this).apply { textSize = 28f; gravity = Gravity.CENTER; text = "Signing in..." }
         watchButton = Button(this).apply { text = "Please wait..."; isEnabled = false }
-        payoutInput = EditText(this).apply { hint = "Payout details (PayPal email, UPI, etc.)" }
+        payoutInput = EditText(this).apply { hint = "Litecoin (LTC) address, e.g. ltc1..." }
         withdrawButton = Button(this).apply {
             text = "Withdraw (min $minWithdrawPoints points)"
             isEnabled = false
@@ -167,7 +167,7 @@ class MainActivity : AppCompatActivity() {
                         val body = JSONObject()
                             .put("points", points)
                             .put("account", account)
-                            .put("method", "manual")
+                            .put("method", "LTC")
                             .toString()
                         conn.outputStream.use { it.write(body.toByteArray()) }
 
@@ -175,7 +175,7 @@ class MainActivity : AppCompatActivity() {
                         val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
                             ?.bufferedReader()?.readText() ?: ""
                         if (code in 200..299) {
-                            "Withdrawal requested. It will be reviewed soon."
+                            "Withdrawal queued. LTC is sent in the daily payout."
                         } else {
                             runCatching { JSONObject(text).optString("error") }.getOrNull()
                                 ?.takeIf { it.isNotEmpty() } ?: "Failed ($code)"

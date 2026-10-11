@@ -22,3 +22,11 @@ Ad unit > Server-side verification > enable > paste the endpoint URL.
 - Pay the user manually, then edit the document and set `status` to `paid`.
   To reject, set `status` to `rejected` and add the points back to `users/<uid>.points` by hand.
 - Republish `firestore.rules` in the Firebase console after updating.
+
+## Litecoin auto payout
+- Users enter an LTC address; `api/withdraw.js` validates it, deducts points, and queues the request.
+- `api/pay-batch.js` runs daily (vercel.json, 12:00 UTC) and pays all queued requests in ONE transaction.
+- Vercel env vars: `LTC_WIF` (hot wallet key), `BLOCKCYPHER_TOKEN`, `CRON_SECRET` (long random string),
+  `AUTO_PAY=true`. Optional: `MAX_USD_PER_PAYOUT` (20), `MAX_USD_PER_BATCH` (100), `FEE_RATE` (10).
+- Make the wallet: `npm install && node scripts/gen-wallet.js`. Use a NEW wallet, fund it with a small amount only.
+- Statuses: queued > sending > paid (with txid). `needs_review` = check by hand (never retried automatically).
