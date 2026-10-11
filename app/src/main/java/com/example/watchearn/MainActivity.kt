@@ -3,6 +3,7 @@ package com.example.watchearn
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -19,46 +20,58 @@ import com.google.android.gms.ads.rewarded.ServerSideVerificationOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.concurrent.thread
 
 /*
- * build.gradle (app) dependencies:
- *   implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
- *   implementation("com.google.firebase:firebase-auth")
- *   implementation("com.google.firebase:firebase-firestore")
- *   implementation("com.google.android.gms:play-services-ads:23.3.0")
- * Plugins: com.google.gms.google-services (plus google-services.json in app/)
- *
- * The app NEVER writes points. AdMob calls the Cloud Function (functions/index.js),
- * which verifies the reward and credits Firestore. The app only reads the balance.
+ * The app never writes points. The server credits them after AdMob verification,
+ * and deducts them when a withdrawal is requested (api/withdraw.js).
  */
 class MainActivity : AppCompatActivity() {
 
-    private val testRewardedId = "ca-app-pub-4283964646300912/9324597260" // your rewarded ad unit
+    private val rewardedAdUnitId = "ca-app-pub-4283964646300912/9324597260"
 
-    // Add your phone's test device ID here (find it in logcat: "setTestDeviceIds").
-    // Your device then gets TEST ads from your real unit, which is safe for your account.
+    // Add your phone's test device ID here (logcat: "setTestDeviceIds") so your own
+    // device gets test ads from your real unit. Never tap real ads on your own phone.
     private val testDeviceIds: List<String> = listOf()
+
+    private val withdrawUrl = "https://earn-reward-537n.vercel.app/api/withdraw"
+    private val minWithdrawPoints = 100000L // keep in sync with api/withdraw.js
+
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
 
     private var uid: String? = null
     private var rewardedAd: RewardedAd? = null
     private var balanceListener: ListenerRegistration? = null
+    private var currentPoints = 0L
 
     private lateinit var pointsText: TextView
     private lateinit var watchButton: Button
+    private lateinit var payoutInput: EditText
+    private lateinit var withdrawButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         pointsText = TextView(this).apply { textSize = 28f; gravity = Gravity.CENTER; text = "Signing in..." }
         watchButton = Button(this).apply { text = "Please wait..."; isEnabled = false }
+        payoutInput = EditText(this).apply { hint = "Payout details (PayPal email, UPI, etc.)" }
+        withdrawButton = Button(this).apply {
+            text = "Withdraw (min $minWithdrawPoints points)"
+            isEnabled = false
+            setOnClickListener { requestWithdraw() }
+        }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(48, 48, 48, 48)
             addView(pointsText)
             addView(watchButton)
+            addView(payoutInput)
+            addView(withdrawButton)
         })
 
         MobileAds.setRequestConfiguration(
@@ -81,10 +94,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun onSignedIn(userId: String) {
         uid = userId
-        // Live balance from Firestore (read-only for the app)
         balanceListener = db.collection("users").document(userId)
             .addSnapshotListener { snap, _ ->
-                pointsText.text = "Points: ${snap?.getLong("points") ?: 0}"
+                currentPoints = snap?.getLong("points") ?: 0L
+                pointsText.text = "Points: $currentPoints"
+                withdrawButton.isEnabled = currentPoints >= minWithdrawPoints
             }
         watchButton.setOnClickListener { showAd() }
         loadAd()
@@ -94,7 +108,7 @@ class MainActivity : AppCompatActivity() {
         watchButton.isEnabled = false
         watchButton.text = "Loading ad..."
         RewardedAd.load(
-            this, testRewardedId, AdRequest.Builder().build(),
+            this, rewardedAdUnitId, AdRequest.Builder().build(),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     rewardedAd = ad
@@ -116,7 +130,6 @@ class MainActivity : AppCompatActivity() {
         val ad = rewardedAd ?: return loadAd()
         val userId = uid ?: return
 
-        // Tells AdMob which user to include in the server callback
         ad.setServerSideVerificationOptions(
             ServerSideVerificationOptions.Builder().setUserId(userId).build()
         )
@@ -125,9 +138,61 @@ class MainActivity : AppCompatActivity() {
             override fun onAdFailedToShowFullScreenContent(error: AdError) { rewardedAd = null; loadAd() }
         }
         ad.show(this) {
-            // Don't credit here. The server credits after verifying; balance updates live.
             Toast.makeText(this, "Verifying reward...", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun requestWithdraw() {
+        val account = payoutInput.text.toString().trim()
+        if (account.isEmpty()) {
+            Toast.makeText(this, "Enter your payout details first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val user = auth.currentUser ?: return
+        val points = currentPoints
+        withdrawButton.isEnabled = false
+
+        user.getIdToken(false)
+            .addOnSuccessListener { result ->
+                thread {
+                    val message = try {
+                        val conn = (URL(withdrawUrl).openConnection() as HttpURLConnection).apply {
+                            requestMethod = "POST"
+                            doOutput = true
+                            connectTimeout = 15000
+                            readTimeout = 15000
+                            setRequestProperty("Content-Type", "application/json")
+                            setRequestProperty("Authorization", "Bearer ${result.token}")
+                        }
+                        val body = JSONObject()
+                            .put("points", points)
+                            .put("account", account)
+                            .put("method", "manual")
+                            .toString()
+                        conn.outputStream.use { it.write(body.toByteArray()) }
+
+                        val code = conn.responseCode
+                        val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                            ?.bufferedReader()?.readText() ?: ""
+                        if (code in 200..299) {
+                            "Withdrawal requested. It will be reviewed soon."
+                        } else {
+                            runCatching { JSONObject(text).optString("error") }.getOrNull()
+                                ?.takeIf { it.isNotEmpty() } ?: "Failed ($code)"
+                        }
+                    } catch (e: Exception) {
+                        "Network error, try again"
+                    }
+                    runOnUiThread {
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                        withdrawButton.isEnabled = currentPoints >= minWithdrawPoints
+                    }
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Could not verify login", Toast.LENGTH_SHORT).show()
+                withdrawButton.isEnabled = currentPoints >= minWithdrawPoints
+            }
     }
 
     override fun onDestroy() {
