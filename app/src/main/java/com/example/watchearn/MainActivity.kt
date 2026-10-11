@@ -160,7 +160,7 @@ class MainActivity : AppCompatActivity() {
                             requestMethod = "POST"
                             doOutput = true
                             connectTimeout = 15000
-                            readTimeout = 15000
+                            readTimeout = 45000
                             setRequestProperty("Content-Type", "application/json")
                             setRequestProperty("Authorization", "Bearer ${result.token}")
                         }
@@ -175,7 +175,7 @@ class MainActivity : AppCompatActivity() {
                         val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
                             ?.bufferedReader()?.readText() ?: ""
                         if (code in 200..299) {
-                            "Withdrawal queued. LTC is sent in the daily payout."
+                            if (runCatching { JSONObject(text).optBoolean("paid") }.getOrDefault(false)) "Paid! Your LTC is on its way." else "Withdrawal queued. It will be sent shortly."
                         } else {
                             runCatching { JSONObject(text).optString("error") }.getOrNull()
                                 ?.takeIf { it.isNotEmpty() } ?: "Failed ($code)"

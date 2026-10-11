@@ -20,6 +20,18 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+
+    // Same signing key for every CI build, so new APKs install over the old app
+    // (keeps the anonymous user and its points). For testing only: Play release
+    // builds must use a separate, private upload key.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
 }
 
 dependencies {

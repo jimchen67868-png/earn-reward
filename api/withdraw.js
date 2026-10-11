@@ -3,6 +3,7 @@
 // The daily /api/pay-batch job sends the LTC.
 const admin = require("firebase-admin");
 const { isValidLtcAddress } = require("../lib/ltc");
+const { runPayout } = require("../lib/payout");
 
 const MIN_POINTS = 2000;     // minimum withdrawal
 const POINTS_PER_USD = 200000; // 200000 points = $1.00 (keep this well below your real ad earnings!)
@@ -59,7 +60,17 @@ module.exports = async (req, res) => {
       });
     });
 
-    res.status(200).json({ ok: true });
+    // Instant payout: send right away (falls back to queued if anything goes wrong)
+    let paid = false;
+    if (process.env.AUTO_PAY === "true") {
+      try {
+        await runPayout();
+        paid = (await reqRef.get()).data().status === "paid";
+      } catch (e) {
+        console.error("instant payout failed:", e.message);
+      }
+    }
+    res.status(200).json({ ok: true, paid });
   } catch (e) {
     if (e.message === "PENDING") return res.status(400).json({ error: "You already have a withdrawal in progress" });
     if (e.message === "INSUFFICIENT") return res.status(400).json({ error: "Not enough points" });

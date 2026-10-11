@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/*.js": {
-      "includeFiles": "node_modules/tiny-secp256k1/lib/**"
+      "includeFiles": "node_modules/tiny-secp256k1/lib/**",
+      "maxDuration": 40
     }
   },
   "crons": [
