@@ -1,7 +1,7 @@
 {
   "name": "earn-reward-api",
   "private": true,
-  "engines": { "node": "20.x" },
+  "engines": { "node": "22.x" },
   "dependencies": {
     "firebase-admin": "^12.6.0"
   }
