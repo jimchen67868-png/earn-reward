@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
 
     const message = qs.substring(0, idx);
     const { signature, key_id, user_id, transaction_id } = req.query;
-    if (!signature || !key_id || !user_id || !transaction_id) {
+    if (!signature || !key_id || !transaction_id) {
       return res.status(400).send("missing params");
     }
 
@@ -47,6 +47,7 @@ module.exports = async (req, res) => {
     const valid = crypto.verify("sha256", Buffer.from(message), pem, sig);
     if (!valid) return res.status(403).send("bad signature");
 
+    if (!user_id) return res.status(200).send("ok, no user_id");
     const today = new Date().toISOString().slice(0, 10);
     const userRef = db.doc(`users/${user_id}`);
     const txRef = db.doc(`rewards/${transaction_id}`);
